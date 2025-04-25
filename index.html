@@ -1,0 +1,153 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <title>Trivium Shifrlash</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      justify-content: center;
+      padding-top: 50px;
+    }
+    .container {
+      background: #fff;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 500px;
+    }
+    textarea, input {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+    button {
+      width: 48%;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Trivium Algoritmiga Asoslangan Shifrlash</h2>
+    <textarea id="plaintext" placeholder="Matn kiriting..."></textarea>
+    <input type="text" id="key" placeholder="Kalit (10 belgidan kam bo'lmasin)">
+    <input type="text" id="iv" placeholder="IV (10 belgidan kam bo'lmasin)">
+    <div class="buttons">
+      <button onclick="handleEncrypt()">🔐 Shifrlash</button>
+      <button onclick="handleDecrypt()">🔓 Deshifrlash</button>
+    </div>
+    <h3>Natija:</h3>
+    <textarea id="result" readonly></textarea>
+  </div>
+
+  <script>
+    class Trivium {
+      constructor(key, iv) {
+        this.state = new Array(288).fill(0);
+        const keyBits = this.strToBits(key.padEnd(10, '\0').slice(0, 10));
+        const ivBits = this.strToBits(iv.padEnd(10, '\0').slice(0, 10));
+
+        for (let i = 0; i < 80; i++) {
+          this.state[i] = keyBits[i];
+          this.state[i + 93] = ivBits[i];
+        }
+        this.state[285] = this.state[286] = this.state[287] = 1;
+
+        for (let i = 0; i < 4 * 288; i++) this.genBit();
+      }
+
+      strToBits(str) {
+        return str.split('').map(ch => ch.charCodeAt(0).toString(2).padStart(8, '0')).join('').split('').map(Number);
+      }
+
+      bitsToStr(bits) {
+        let str = '';
+        for (let i = 0; i < bits.length; i += 8) {
+          const byte = bits.slice(i, i + 8).join('');
+          str += String.fromCharCode(parseInt(byte, 2));
+        }
+        return str;
+      }
+
+      genBit() {
+        const s = this.state;
+        const t1 = s[65] ^ s[92];
+        const t2 = s[161] ^ s[176];
+        const t3 = s[242] ^ s[287];
+
+        const z = t1 ^ t2 ^ t3;
+
+        const t1f = t1 ^ (s[90] & s[91]) ^ s[170];
+        const t2f = t2 ^ (s[174] & s[175]) ^ s[263];
+        const t3f = t3 ^ (s[285] & s[286]) ^ s[68];
+
+        s.pop();
+        s.unshift(t3f);
+        s.splice(93, 0, t1f);
+        s.splice(177, 0, t2f);
+        return z;
+      }
+
+      generateKeystream(len) {
+        return Array.from({ length: len * 8 }, () => this.genBit());
+      }
+
+      encrypt(plaintext) {
+        const bits = this.strToBits(plaintext);
+        const keystream = this.generateKeystream(plaintext.length);
+        const cipherBits = bits.map((b, i) => b ^ keystream[i]);
+        return btoa(this.bitsToStr(cipherBits));
+      }
+
+      decrypt(base64text) {
+        const cipher = atob(base64text);
+        const bits = this.strToBits(cipher);
+        const keystream = this.generateKeystream(cipher.length);
+        const plainBits = bits.map((b, i) => b ^ keystream[i]);
+        return this.bitsToStr(plainBits);
+      }
+    }
+
+    function handleEncrypt() {
+      const text = document.getElementById("plaintext").value;
+      const key = document.getElementById("key").value;
+      const iv = document.getElementById("iv").value;
+
+      const trivium = new Trivium(key, iv);
+      const encrypted = trivium.encrypt(text);
+      document.getElementById("result").value = encrypted;
+    }
+
+    function handleDecrypt() {
+      const text = document.getElementById("plaintext").value;
+      const key = document.getElementById("key").value;
+      const iv = document.getElementById("iv").value;
+
+      const trivium = new Trivium(key, iv);
+      const decrypted = trivium.decrypt(text);
+      document.getElementById("result").value = decrypted;
+    }
+  </script>
+</body>
+</html>
